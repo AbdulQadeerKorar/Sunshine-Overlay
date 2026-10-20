@@ -1,0 +1,49 @@
+name: Build themed Dolphin
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /opt/hostedtoolcache/CodeQL || true
+      - name: Unzip overlay pack
+        run: unzip -q SunshineOverlay.zip
+      - name: Get Dolphin source
+        run: |
+          git clone --depth 1 https://github.com/dolphin-emu/dolphin.git dolphin
+          cd dolphin && git submodule update --init --recursive --jobs 4
+      - name: Apply theme
+        run: |
+          pip install pillow numpy
+          python SunshineOverlay/themegen.py dolphin/Source/Android/app/src/main/res
+      - name: Separate app id
+        run: |
+          F=$(find dolphin/Source/Android/app -maxdepth 1 -name 'build.gradle*' | head -1)
+          sed -i '/applicationId/ s/org.dolphinemu.dolphinemu/org.dolphinemu.dolphinemu.sunshine/' "$F"
+      - name: Accept SDK licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      - name: Build (arm64 release)
+        working-directory: dolphin/Source/Android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
+      - name: Sign with a throwaway key
+        run: |
+          APK=$(find dolphin/Source/Android/app/build/outputs/apk -name '*.apk' | grep -i release | head -1)
+          echo "Built: $APK"
+          BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
+          keytool -genkey -v -keystore ci.jks -alias k -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Local"
+          "$ANDROID_HOME/build-tools/$BT/zipalign" -p -f 4 "$APK" aligned.apk
+          "$ANDROID_HOME/build-tools/$BT/apksigner" sign --ks ci.jks --ks-pass pass:android --key-pass pass:android --out Dolphin-Sunshine-Themed.apk aligned.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dolphin-Sunshine-Themed
+          path: Dolphin-Sunshine-Themed.apk
