@@ -35,10 +35,15 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
+            - name: Find the APK
+        run: |
+          echo "---- every apk/aab Gradle produced ----"
+          find dolphin -type f \( -name '*.apk' -o -name '*.aab' \) -not -path '*/intermediates/*' | head -20
       - name: Sign with a throwaway key
         run: |
-          APK=$(find dolphin/Source/Android/app/build/outputs/apk -name '*.apk' | grep -i release | head -1)
-          echo "Built: $APK"
+          APK=$(find dolphin -type f -name '*.apk' -not -path '*/intermediates/*' | grep -vi androidTest | head -1)
+          echo "Using: $APK"
+          test -n "$APK"
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           keytool -genkey -v -keystore ci.jks -alias k -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Local"
           "$ANDROID_HOME/build-tools/$BT/zipalign" -p -f 4 "$APK" aligned.apk
