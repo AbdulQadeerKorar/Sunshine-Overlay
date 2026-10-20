@@ -35,7 +35,7 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease -Pandroid.injected.build.abi=arm64-v8a --no-daemon
-            - name: Find the APK
+      - name: Find the APK
         run: |
           echo "---- every apk/aab Gradle produced ----"
           find dolphin -type f \( -name '*.apk' -o -name '*.aab' \) -not -path '*/intermediates/*' | head -20
@@ -46,9 +46,3 @@ jobs:
           test -n "$APK"
           BT=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)
           keytool -genkey -v -keystore ci.jks -alias k -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Local"
-          "$ANDROID_HOME/build-tools/$BT/zipalign" -p -f 4 "$APK" aligned.apk
-          "$ANDROID_HOME/build-tools/$BT/apksigner" sign --ks ci.jks --ks-pass pass:android --key-pass pass:android --out Dolphin-Sunshine-Themed.apk aligned.apk
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Dolphin-Sunshine-Themed
-          path: Dolphin-Sunshine-Themed.apk
